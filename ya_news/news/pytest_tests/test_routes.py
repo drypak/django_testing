@@ -1,95 +1,114 @@
 import pytest
-from django.urls import reverse
 from django.contrib.auth import get_user_model
+from http import HTTPStatus
 
-from news.models import Comment
+from news.forms import CommentForm
 
+from news.forms import BAD_WORDS
 
 User = get_user_model()
 
-
-@pytest.fixture
-def author(django_user_model):
-    return django_user_model.objects.create_user(
-        username='author',
-        password='pass',
-    )
+pytestmark = pytest.mark.django_db
 
 
-@pytest.fixture
-def reader(django_user_model):
-    return django_user_model.objects.create_user(
-        username='reader',
-        password='pass',
-    )
+def test_home_and_detail_avilable_for_anonymous_user(
+        client,
+        home_url,
+        news_url
+):
+    """
+    Проверяет, что главная и детальная страницы
+    Доступны для анонимных пользователей.
+    """
+    assert client.get(home_url).status_code == HTTPStatus.OK
+    assert client.get(news_url).status_code == HTTPStatus.OK
 
 
-@pytest.fixture
-def comment(news, author):
-    return Comment.objects.create(
-        news=news,
-        author=author,
-        text='Comment text',
-    )
+@pytest.mark.parametrize('bad_word', BAD_WORDS)
+def test_comment_form_rejects_bad_words(bad_word):
+    """
+    Проверяет, что форма комментария
+    Отклоняет слова, содержащие запрещенные слова/
+    """
+    form_data = {'text': bad_word}
+    form = CommentForm(data=form_data)
+    assert not form.is_valid()
+    assert 'text' in form.errors
 
 
-@pytest.mark.django_db
-def test_home_and_detail_avilable_for_anonymous_user(client, news):
-    home_url = reverse('news:home')
-    detail_url = reverse('news:detail', args=[news.id])
+def test_edit_delete_pages_for_comment_author(
+        authenticated_client,
+        delete_comment_url,
+        edit_comment_url,
+):
+    """
+    Проверяет, что страницы редактирования и удаления
+    Доступны только автору комментария.
+    """
+    response_edit = authenticated_client.get(edit_comment_url)
+    response_delete = authenticated_client.get(delete_comment_url)
 
-    assert client.get(home_url).status_code == 200
-    assert client.get(detail_url).status_code == 200
-
-
-@pytest.mark.django_db
-def test_edit_delete_pages_for_comment_author(client, comment, author):
-    client.force_login(author)
-    edit_url = reverse('news:edit', args=[comment.id])
-    delete_url = reverse('news:delete', args=[comment.id])
-
-    assert client.get(edit_url).status_code == 200
-    assert client.get(delete_url).status_code == 200
-
-
-@pytest.mark.django_db
-def test_edit_delete_redirects_anonymous_user(client, comment):
-    edit_url = reverse('news:edit', args=[comment.id])
-    delete_url = reverse('news:delete', args=[comment.id])
-    login_url = reverse('users:login')
-
-    edit_response = client.get(edit_url)
-    delete_response = client.get(delete_url)
-
-    assert edit_response.status_code == 302
-    assert delete_response.status_code == 302
-
-    assert edit_response.url.startswith(login_url)
-    assert delete_response.url.startswith(login_url)
-
-
-@pytest.mark.django_db
-def test_cannot_edit_or_delete_foreign_comment(client, comment, reader):
-    client.force_login(reader)
-
-    edit_url = reverse('news:edit', args=[comment.id])
-    delete_url = reverse('news:delete', args=[comment.id])
-
-    assert client.get(edit_url).status_code == 404
-    assert client.get(delete_url).status_code == 404
+    assert response_edit.status_code == HTTPStatus.NOT_FOUND
+    assert response_delete.status_code == HTTPStatus.NOT_FOUND
 
 
 @pytest.mark.parametrize(
-    'url',
-    [
-        'users:login',
-        'users:logout',
-        'users:signup',
-    ]
-
+    'url_fixture_name',
+    ['edit_comment_url', 'delete_comment_url']
 )
-@pytest.mark.django_db
-def test_auth_pages_accessible_for_anonymous_user(client, url):
-    url_name = reverse(url)
-    response = client.get(url_name)
-    assert response.status_code == 200
+def test_redirects_anonymous_user_to_login(
+    client,
+    request,
+    login_url,
+    url_fixture_name,
+):
+    """
+    Проверяет, что анонимный пользователь
+    Перенаправляется на страницу входа
+    При попытке доступа к страницам редактирования и удаления комментариев.
+    """
+    protected_url = request.getfixturevalue(url_fixture_name)
+    response = client.get(protected_url)
+
+    assert response.status_code == HTTPStatus.FOUND
+    assert response.url.startswith(login_url)
+
+
+@pytest.mark.parametrize(
+    'url_fixture_name',
+    ['edit_comment_url', 'delete_comment_url']
+)
+def test_cannot_edit_or_delete_foreign_comment(
+        request,
+        reader,
+        client,
+        url_fixture_name,
+):
+    """
+    Проверяет, что пользователь
+    Не может редактировать или удалять
+    Комментарии другого пользователя.
+    """
+    client.force_login(reader)
+    url = request.getfixturevalue(url_fixture_name)
+
+    response = client.get(url)
+    assert response.status_code == HTTPStatus.NOT_FOUND
+
+
+@pytest.mark.parametrize(
+    'url_name',
+    ['login', 'logout', 'signup']
+)
+def test_auth_pages_accessible_for_anonymous_user(
+        client,
+        url_name,
+        auth_urls
+):
+    """
+    Проверяет, что страницы аутентификации (вход, выход, регистрация)
+    Доступны для анонимных пользователей.
+    """
+    url = auth_urls[url_name]
+    response = client.get(url)
+    assert response.status_code == HTTPStatus.OK

@@ -1,99 +1,87 @@
 from http import HTTPStatus
-
-from django.contrib.auth import get_user_model
-from django.test import TestCase
-from django.urls import reverse
-
-from notes.models import Note
-
-User = get_user_model()
+from .base_test import BaseTestCase, URLS_INSTANCE
 
 
-class TestRoutes(TestCase):
+class TestNoteRoutes(BaseTestCase):
+    """Тестирование доступности роутов."""
+    def test_routes_available_for_anonymous(self):
+        """Проверка доступности для анонимных пользователей."""
+        self.client.logout()
+        anonymous_routes = [
+            'home',
+            'signup',
+            'login',
+            'logout',
+        ]
+        for name in anonymous_routes:
+            route = getattr(URLS_INSTANCE, name)
+            with self.subTest(route=name):
+                response = self.client.get(route)
+                self.assertEqual(response.status_code, HTTPStatus.OK)
 
-    @classmethod
-    def setUpTestData(cls):
-        cls.author = User.objects.create_user(
-            username='author_user',
-            password='pass',
-        )
-        cls.other_user = User.objects.create_user(
-            username='other_user',
-            password='pass',
-        )
-        cls.note = Note.objects.create(
-            title='Test',
-            text='Text',
-            slug='test-note',
-            author=cls.author,
-        )
-        cls.routes = {
-            'home': reverse('notes:home'),
-            'notes_list': reverse('notes:list'),
-            'note_detail': reverse(
-                'notes:detail', kwargs={'slug': cls.note.slug}
-            ),
-            'note_add': reverse('notes:add'),
-            'note_done': reverse('notes:success'),
-            'note_edit': reverse('notes:edit', kwargs={'slug': cls.note.slug}),
-            'note_delete': reverse(
-                'notes:delete', kwargs={'slug': cls.note.slug}
-            ),
-            'login': reverse('users:login'),
-            'logout': reverse('users:logout'),
-            'signup': reverse('users:signup'),
-        }
+        protected_routes = [
+            'notes_list',
+            'add_note',
+        ]
+        login_url = URLS_INSTANCE.login
 
-    def test_home_avilable_for_anonymous(self):
-        response = self.client.get(self.routes['home'])
-        self.assertEqual(response.status_code, HTTPStatus.OK)
+        for name in protected_routes:
+            route = getattr(URLS_INSTANCE, name)
+            with self.subTest(route=name):
+                response = self.client.get(route)
+                expected_redirect = f'{login_url}?next={route}'
+                self.assertRedirects(response, expected_redirect)
 
-    def test_auth_user_routes_avilable(self):
-        self.client.force_login(self.author)
+    def test_auth_user_routes_available(self):
+        """Проверка доступности для авторизованных пользователей."""
         for name in [
             'notes_list',
-            'note_add',
-            'note_done',
+            'add_note',
         ]:
             with self.subTest(name=name):
-                response = self.client.get(self.routes[name])
+                response = self.client.get(getattr(URLS_INSTANCE, name))
                 self.assertEqual(response.status_code, HTTPStatus.OK)
 
     def test_other_user_gets_404_on_protected_routes(self):
-        self.client.force_login(self.other_user)
+        """Проверка доступности для других пользователей."""
+        self.client.force_login(self.reader)
         for name in [
             'note_detail',
-            'note_edit',
-            'note_delete',
+            'edit_note',
+            'delete_note',
         ]:
             with self.subTest(name=name):
-                response = self.client.get(self.routes[name])
+                response = self.client.get(getattr(URLS_INSTANCE, name))
                 self.assertEqual(response.status_code, HTTPStatus.NOT_FOUND)
 
     def test_anonymous_redirected_to_login(self):
-        protected_routes = [
+        """Проверка редиректа для анонимных пользователей."""
+        self.client.logout()
+        login_url = URLS_INSTANCE.login
+        protected = [
             'notes_list',
-            'note_add',
-            'note_done',
+            'add_note',
+            'success',
+            'delete_note',
             'note_detail',
-            'note_edit',
-            'note_delete',
+            'edit_note',
         ]
-        login_url = self.routes['login']
-        for name in protected_routes:
+        for name in protected:
             with self.subTest(name=name):
-                response = self.client.get(self.routes[name])
+                response = self.client.get(getattr(URLS_INSTANCE, name))
                 self.assertRedirects(
                     response,
-                    f'{login_url}?next={self.routes[name]}'
+                    f'{login_url}?next={getattr(URLS_INSTANCE, name)}',
                 )
 
     def test_auth_routes_avilable_to_all_users(self):
+        """Проверка доступности для всех пользователей."""
+        self.client.logout()
         for name in [
             'signup',
-            'logout',
             'login',
+            'logout',
         ]:
             with self.subTest(name=name):
-                response = self.client.get(self.routes[name])
+                response = self.client.get(getattr(URLS_INSTANCE, name))
                 self.assertEqual(response.status_code, HTTPStatus.OK)

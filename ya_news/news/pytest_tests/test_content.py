@@ -1,60 +1,72 @@
 import pytest
-from django.urls import reverse
-from django.utils import timezone
+from news.models import Comment
+from yanews.settings import NEWS_COUNT_ON_HOME_PAGE
+from news.forms import CommentForm
 
-from news.models import Comment, News
-
-
-@pytest.fixture
-def new_list():
-    new_objects = []
-    for i in range(10):
-        news = News.objects.create(
-            title=f'Title {i}',
-            text=f'Text {i}',
-            date=timezone.now(),
-        )
-        new_objects.append(news)
-
-    return new_objects
+pytestmark = pytest.mark.django_db
 
 
-@pytest.mark.django_db
-def test_news_count_on_main_page(client, new_list):
-    url = reverse('news:home')
-    response = client.get(url)
+def test_news_count_on_main_page(client, new_list, home_url):
+    """Проверяем, что на главной странице не более 10 новостей.
+
+    Так же проверяем, что количество новостей совпадает с количеством
+    Новостей в БД. Для главной страницы.
+    """
+    response = client.get(home_url)
     object_list = response.context['object_list']
-    assert len(object_list) <= 10
-    assert len(object_list) == len(new_list)
+    assert object_list.count() <= NEWS_COUNT_ON_HOME_PAGE
+    assert object_list.count() == len(new_list)
 
 
-@pytest.mark.django_db
-def test_news_sorted_by_date(client, new_list):
-    url = reverse('news:home')
-    response = client.get(url)
+def test_news_sorted_by_date(client, new_list, home_url):
+    """Проверяет, что новости отсортированы по дате в порядке убывания."""
+    response = client.get(home_url)
     object_list = response.context['object_list']
     dates = [news.date for news in object_list]
     assert dates == sorted(dates, reverse=True)
 
 
-@pytest.mark.django_db
-def test_comments_ordered_by_created(news_with_comments, client):
-    url = reverse('news:detail', args=[news_with_comments.id])
-    client.get(url)
-    comments = Comment.objects.filter(news=news_with_comments).all()
-    created_times = [comment.created for comment in comments]
+def test_comments_ordered_by_created(
+        news_with_comments, client,
+        news_url,
+        multi_comments,
+):
+    """Проверяет, что комментарии отсортированы по времени создания."""
+    client.get(news_url)
+
+    comments = Comment.objects.filter(
+        news=news_with_comments).order_by('created')
+
+    created_times = list(comments.values_list('created', flat=True))
+
     assert created_times == sorted(created_times)
 
 
-@pytest.mark.django_db
-def test_comments_form(client, user, news):
-    url = reverse('news:detail', args=[news.id])
+@pytest.mark.parametrize(
+    'client_fixture, form_class',
+    [
+        ('anonymous_client', False),
+        ('authenticated_client', True),
+    ]
+)
+def test_comment_form(
+    client_fixture,
+    form_class,
+    request,
+    news_url
+):
+    """Проверяет, что форма комментария доступна для анонимных
+    и авторизованных пользователей.
+    """
+    client = request.getfixturevalue(client_fixture)
+    response = client.get(news_url)
 
-    # anonymous user
-    anonym = client.get(url)
-    assert 'form' not in anonym.context
+    assert response.status_code == 200
 
-    # authenticated user
-    client.force_login(user)
-    auth = client.get(url)
-    assert 'form' in auth.context
+    form = response.context.get('form', None)
+
+    if form_class:
+        assert form is not None
+        assert isinstance(form, CommentForm)
+    else:
+        assert form is None
