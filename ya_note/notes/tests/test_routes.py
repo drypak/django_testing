@@ -88,7 +88,6 @@ class TestNoteRoutes(BaseTestCase):
                 response = self.client.get(getattr(URLS_INSTANCE, name))
                 self.assertEqual(response.status_code, HTTPStatus.OK)
 
-    @pytest.mark.usefixtures('authenticated_user')
     def test_create_note_redirects_to_success_page(self):
         """Проверка редиректа после создания заметки."""
         response = self.user_client.post(
