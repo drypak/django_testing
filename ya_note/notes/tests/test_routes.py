@@ -1,4 +1,3 @@
-import pytest
 from http import HTTPStatus
 
 from .base_test import BaseTestCase, URLS_INSTANCE, UPDATE_NOTE_DATA
