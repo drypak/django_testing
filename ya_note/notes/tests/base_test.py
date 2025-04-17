@@ -1,8 +1,11 @@
 from collections import namedtuple
+
 from django.contrib.auth import get_user_model
-from django.urls import reverse
-from notes.models import Note
 from django.test import Client, TestCase
+from django.urls import reverse
+
+from notes.models import Note
+
 
 User = get_user_model()
 
@@ -14,15 +17,14 @@ SLUG = 'sample_slug'
 NEW_SLUG = 'new_slug'
 
 NOTE_DATA = {
-    'title': 'Заметка',
-    'text': 'Содержание заметки',
+    'title': 'Комментарий',
+    'text': 'Содержание комментария',
     'slug': SLUG
 }
 
 UPDATE_NOTE_DATA = {
-    'title': 'Обновленная заметка',
-    'text': 'Обновлённый текст заметки',
-    'slug': NEW_SLUG
+    'title': 'Updated comment',
+    'text': 'Обновлённый текст комментария',
 }
 
 URLS = namedtuple(
@@ -57,6 +59,8 @@ class BaseTestCase(TestCase):
     """Базовый тест для всех тестов. Настройка пользователей и заметок."""
     @classmethod
     def setUpTestData(cls):
+        cls.anonymous_client = Client()
+
         cls.user = User.objects.create_user(
             username=AUTHOR_USERNAME,
             password=PASSWORD,
@@ -77,7 +81,3 @@ class BaseTestCase(TestCase):
             slug=NOTE_DATA['slug'],
             author=cls.user,
         )
-
-    def setUp(self):
-        self.client = Client()
-        self.client.force_login(self.user)

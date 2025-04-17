@@ -1,10 +1,10 @@
 import pytest
-from django.contrib.auth import get_user_model
-from django.contrib.auth.models import User
-from django.utils import timezone
-from django.urls import reverse
 
-from yanews.settings import NEWS_COUNT_ON_HOME_PAGE
+from django.conf import settings
+from django.contrib.auth import get_user_model
+from django.urls import reverse
+from django.utils import timezone
+from django.test import Client
 
 from news.models import Comment, News
 
@@ -69,46 +69,30 @@ def comment(news, user):
 
 
 @pytest.fixture
-def news_with_comments(db):
-    """
-    Фикстура для создания новости с комментариями.
-
-    Используется в тестах где требуется новость с комментариями.
-    Создает новость с двумя комментариями.
-    """
-    news = News.objects.create(
-        title='Тест',
-        text='Тестовый текст',
-    )
-    user = User.objects.create_user(
-        username='user',
-        password='pass',
-    )
-    Comment.objects.create(
-        news=news,
-        author=user,
-        text='коммент 1',
-    )
-    Comment.objects.create(
-        news=news,
-        author=user,
-        text='коммент 2',
-    )
+def news_with_comments(news, user):
+    """Фикстура создаёт новость с 15 комментариями."""
+    comments = [
+        Comment(
+            news=news,
+            author=user,
+            text=f'Comment {i}',
+        )
+        for i in range(1, 16)
+    ]
+    Comment.objects.bulk_create(comments)
     return news
 
 
 @pytest.fixture
 def new_list():
-    new_objects = [
+    News.objects.bulk_create(
         News(
-            title=f'Title {i}',
-            text=f'Text {i}',
+            title=f'title{i}',
+            text=f'text{i}',
             date=timezone.now(),
         )
-        for i in range(NEWS_COUNT_ON_HOME_PAGE)
-    ]
-    News.objects.bulk_create(new_objects)
-    return new_objects
+        for i in range(settings.NEWS_COUNT_ON_HOME_PAGE)
+    )
 
 
 @pytest.fixture
@@ -137,16 +121,15 @@ def multi_comments(news_with_comments, user):
 
 
 @pytest.fixture
-def anonymous_client(client):
+def anonymous_client():
+    client = Client()
+    client.logout()
     return client
 
 
 @pytest.fixture
-def authenticated_client(client):
-    user = User.objects.create_user(
-        username='testuser',
-        password='testpass',
-    )
+def authenticated_client(user):
+    client = Client()
     client.force_login(user)
     return client
 
@@ -162,7 +145,8 @@ def delete_comment_url(comment):
 
 
 @pytest.fixture
-def author_client(client, author):
+def author_client(author):
+    client = Client()
     client.force_login(author)
     return client
 

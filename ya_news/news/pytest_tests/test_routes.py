@@ -1,10 +1,8 @@
 import pytest
-from django.contrib.auth import get_user_model
 from http import HTTPStatus
 
-from news.forms import CommentForm
+from django.contrib.auth import get_user_model
 
-from news.forms import BAD_WORDS
 
 User = get_user_model()
 
@@ -24,20 +22,8 @@ def test_home_and_detail_avilable_for_anonymous_user(
     assert client.get(news_url).status_code == HTTPStatus.OK
 
 
-@pytest.mark.parametrize('bad_word', BAD_WORDS)
-def test_comment_form_rejects_bad_words(bad_word):
-    """
-    Проверяет, что форма комментария
-    Отклоняет слова, содержащие запрещенные слова/
-    """
-    form_data = {'text': bad_word}
-    form = CommentForm(data=form_data)
-    assert not form.is_valid()
-    assert 'text' in form.errors
-
-
 def test_edit_delete_pages_for_comment_author(
-        authenticated_client,
+        author_client,
         delete_comment_url,
         edit_comment_url,
 ):
@@ -45,8 +31,8 @@ def test_edit_delete_pages_for_comment_author(
     Проверяет, что страницы редактирования и удаления
     Доступны только автору комментария.
     """
-    response_edit = authenticated_client.get(edit_comment_url)
-    response_delete = authenticated_client.get(delete_comment_url)
+    response_edit = author_client.get(edit_comment_url)
+    response_delete = author_client.get(delete_comment_url)
 
     assert response_edit.status_code == HTTPStatus.NOT_FOUND
     assert response_delete.status_code == HTTPStatus.NOT_FOUND

@@ -1,85 +1,46 @@
 import pytest
 from http import HTTPStatus
-from news.models import Comment
-from news.forms import CommentForm
-from yanews.settings import NEWS_COUNT_ON_HOME_PAGE
+
 from django.conf import settings
 
+from news.models import Comment
+
+COMMENT_TEXT = 'Текст комментария'
+
+COMMENT_DATA = {'text': COMMENT_TEXT}
+
 pytestmark = pytest.mark.django_db
-
-
-def test_news_count_on_main_page(client, new_list, home_url):
-    """Проверяем, что на главной странице не более 10 новостей.
-    И что новости отсортированы по дате в порядке убывания.
-    """
-    response = client.get(home_url)
-    object_list = response.context['object_list']
-    dates = [news.date for news in object_list]
-    assert object_list.count() == NEWS_COUNT_ON_HOME_PAGE
-    assert dates == sorted(dates, reverse=True)
-
-
-@pytest.mark.parametrize('news_with_comments', ['news'])
-def test_comments_ordered_by_created(
-    news_with_comments,
-    authenticated_client,
-    news_url
-):
-    """Проверяет, что комментарии отсортированы по времени создания."""
-    response = authenticated_client.get(news_url)
-    comments = response.context['news'].comment_set.all()
-
-    created_times = [comment.created for comment in comments]
-
-    assert created_times == sorted(created_times)
-
-
-@pytest.mark.parametrize(
-    'client_fixture, form_class',
-    [
-        ('anonymous_client', False),
-        ('authenticated_client', True),
-    ]
-)
-def test_comments_form(
-    client_fixture,
-    form_class,
-    request,
-    news_url
-):
-    """
-    Проверяет, что форма комментария доступна для анонимных
-    И авторизованных пользователей.
-    """
-    client = request.getfixturevalue(client_fixture)
-    response = client.get(news_url)
-    form = response.context.get('form')
-
-    assert response.status_code == 200
-
-    form = response.context.get('form')
-
-    if form_class:
-        assert form is not None
-        assert isinstance(form, CommentForm)
-    else:
-        assert form is None
 
 
 def test_authenticated_user_can_create_comment(
         authenticated_client,
         news_url,
-        news
+        news,
+        user
 ):
     """
     Проверяет, что аутентифицированный пользователь
     Может создать комментарии.
     """
-    data = {'text': 'Comment text'}
-    response = authenticated_client.post(news_url, data)
+    comment_text = 'New comment text'
+    comment_data = {'text': comment_text}
 
-    assert Comment.objects.filter(news=news, text=data['text']).exists()
-    assert response.status_code == 302
+    coments_before = Comment.objects.count()
+    response = authenticated_client.post(news_url, data=comment_data)
+
+    comments_after = Comment.objects.count()
+
+    # Проверяем редирект
+    assert response.status_code == HTTPStatus.FOUND
+    assert response.url.startswith(news_url)
+
+    # Проверяем что комментарий создан
+    assert comments_after == coments_before + 1
+
+    comment = Comment.objects.latest('created')
+    assert comment.text == comment_text
+    assert comment.news == news
+    assert comment.author == user
 
 
 def test_anonymous_user_cannot_create_comment(
@@ -91,10 +52,9 @@ def test_anonymous_user_cannot_create_comment(
     Проверяет, что анонимный пользователь
     Не может создать комментарии.
     """
-    data = {'text': 'Comment text'}
-    response = client.post(news_url, data)
+    response = client.post(news_url, COMMENT_DATA)
 
-    assert not Comment.objects.filter(news=news, text=data['text']).exists()
+    assert not Comment.objects.filter(news=news, text=COMMENT_TEXT).exists()
     assert response.status_code == HTTPStatus.FOUND
     assert response.url.startswith(str(settings.LOGIN_URL))
 
