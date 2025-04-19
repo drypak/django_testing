@@ -16,6 +16,11 @@ PASSWORD = 'test_password'
 SLUG = 'sample_slug'
 NEW_SLUG = 'new_slug'
 
+CREATE_NOTE_DATA = {
+    'title': 'text comment',
+    'text': 'Тестовый текст комментария',
+}
+
 NOTE_DATA = {
     'title': 'Комментарий',
     'text': 'Содержание комментария',
@@ -54,9 +59,17 @@ URLS_INSTANCE = URLS(
     reverse('notes:delete', args=(SLUG,)),
 )
 
+PUBLIC_URLS = [
+    URLS_INSTANCE.home,
+    URLS_INSTANCE.login,
+    URLS_INSTANCE.signup,
+    URLS_INSTANCE.logout,
+]
+
 
 class BaseTestCase(TestCase):
     """Базовый тест для всех тестов. Настройка пользователей и заметок."""
+
     @classmethod
     def setUpTestData(cls):
         cls.anonymous_client = Client()

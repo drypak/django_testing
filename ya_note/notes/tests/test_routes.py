@@ -1,35 +1,33 @@
 from http import HTTPStatus
 
-from .base_test import BaseTestCase, URLS_INSTANCE, UPDATE_NOTE_DATA
+from .base_test import (
+    BaseTestCase,
+    URLS_INSTANCE,
+    UPDATE_NOTE_DATA,
+    PUBLIC_URLS,
+)
 
 
 class TestNoteRoutes(BaseTestCase):
     """Тестирование доступности роутов."""
-    def test_routes_available_for_anonymous(self):
-        """Проверка доступности для анонимных пользователей."""
-        self.client.logout()
-        anonymous_routes = [
-            'home',
-            'signup',
-            'login',
-            'logout',
-        ]
-        for name in anonymous_routes:
-            route = getattr(URLS_INSTANCE, name)
-            with self.subTest(route=name):
-                response = self.client.get(route)
+
+    def test_public_routes_accessible_for_anonymous(self):
+        """Публичные роуты доступны для анонимных пользователей."""
+        for route in PUBLIC_URLS:
+            with self.subTest(route=route):
+                response = self.anonymous_client.get(route)
                 self.assertEqual(response.status_code, HTTPStatus.OK)
 
+    def test_protected_routes_redirect_for_anonymous(self):
         protected_routes = [
-            'notes_list',
-            'add_note',
+            URLS_INSTANCE.notes_list,
+            URLS_INSTANCE.add_note,
         ]
         login_url = URLS_INSTANCE.login
 
-        for name in protected_routes:
-            route = getattr(URLS_INSTANCE, name)
-            with self.subTest(route=name):
-                response = self.client.get(route)
+        for route in protected_routes:
+            with self.subTest(route=route):
+                response = self.anonymous_client.get(route)
                 expected_redirect = f'{login_url}?next={route}'
                 self.assertRedirects(response, expected_redirect)
 
@@ -44,15 +42,11 @@ class TestNoteRoutes(BaseTestCase):
                 self.assertEqual(response.status_code, HTTPStatus.OK)
 
     def test_other_user_gets_404_on_protected_routes(self):
-        """Проверка доступности для других пользователей."""
-        self.client.force_login(self.reader)
-        for name in [
-            'note_detail',
-            'edit_note',
-            'delete_note',
-        ]:
+        """Проверка доступности к чужим заметкам."""
+        for name in ['note_detail', 'edit_note', 'delete_note']:
+            route = getattr(URLS_INSTANCE, name)
             with self.subTest(name=name):
-                response = self.client.get(getattr(URLS_INSTANCE, name))
+                response = self.reader_client.get(route)
                 self.assertEqual(response.status_code, HTTPStatus.NOT_FOUND)
 
     def test_anonymous_redirected_to_login(self):
@@ -75,7 +69,7 @@ class TestNoteRoutes(BaseTestCase):
                     f'{login_url}?next={getattr(URLS_INSTANCE, name)}',
                 )
 
-    def test_auth_routes_avilable_to_all_users(self):
+    def test_auth_routes_available_to_all_users(self):
         """Проверка доступности для всех пользователей."""
         self.client.logout()
         for name in [
