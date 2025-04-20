@@ -1,6 +1,5 @@
 import pytest
 from http import HTTPStatus
-
 from django.conf import settings
 
 from news.models import Comment
@@ -9,44 +8,41 @@ COMMENT_TEXT = 'Текст комментария'
 
 COMMENT_DATA = {'text': COMMENT_TEXT}
 
+EDITED_TEXT = 'Edited comment text'
+
 pytestmark = pytest.mark.django_db
 
 
 def test_authenticated_user_can_create_comment(
-        authenticated_client,
-        news_url,
-        news,
-        user
+    authenticated_client,
+    news_url,
+    news,
+    user
 ):
     """
     Проверяет, что аутентифицированный пользователь
     Может создать комментарии.
     """
-    comment_text = 'New comment text'
-    comment_data = {'text': comment_text}
+    comments_before = set(Comment.objects.all())
 
-    coments_before = Comment.objects.count()
-    response = authenticated_client.post(news_url, data=comment_data)
+    response = authenticated_client.post(news_url, data=COMMENT_DATA)
 
-    comments_after = Comment.objects.count()
-
-    # Проверяем редирект
     assert response.status_code == HTTPStatus.FOUND
     assert response.url.startswith(news_url)
 
-    # Проверяем что комментарий создан
-    assert comments_after == coments_before + 1
+    new_comments = set(Comment.objects.all()) - comments_before
+    assert len(new_comments) == 1
 
-    comment = Comment.objects.latest('created')
-    assert comment.text == comment_text
+    comment = new_comments.pop()
+    assert comment.text == COMMENT_TEXT
     assert comment.news == news
     assert comment.author == user
 
 
 def test_anonymous_user_cannot_create_comment(
-        client,
-        news_url,
-        news,
+    client,
+    news_url,
+    news,
 ):
     """
     Проверяет, что анонимный пользователь
@@ -54,15 +50,20 @@ def test_anonymous_user_cannot_create_comment(
     """
     response = client.post(news_url, COMMENT_DATA)
 
-    assert not Comment.objects.filter(news=news, text=COMMENT_TEXT).exists()
+    comment_exists = Comment.objects.filter(
+        news=news,
+        text=COMMENT_TEXT
+    ).exists()
+    assert not comment_exists
+
     assert response.status_code == HTTPStatus.FOUND
     assert response.url.startswith(str(settings.LOGIN_URL))
 
 
 def test_comments_author_can_edit_comment(
-        authenticated_client,
-        comment,
-        edit_comment_url
+    authenticated_client,
+    comment,
+    edit_comment_url
 ):
     """
     Проверяет, что автор комментария
@@ -89,9 +90,9 @@ def test_other_user_cannot_edit_comment(
 
     response = authenticated_client.post(
         edit_comment_url,
-        {'text': 'Edited comment text'}
+        {'text': EDITED_TEXT}
     )
     assert response.status_code == HTTPStatus.NOT_FOUND
     comment.refresh_from_db()
 
-    assert comment.text != 'Edited comment text'
+    assert comment.text != EDITED_TEXT

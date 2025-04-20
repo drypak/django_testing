@@ -1,10 +1,9 @@
-from collections import namedtuple
-
 from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
-from django.urls import reverse
 
 from notes.models import Note
+
+from .urls_groups import SLUG
 
 
 User = get_user_model()
@@ -13,7 +12,6 @@ AUTHOR_USERNAME = 'test_author'
 READER_USERNAME = 'test_reader'
 PASSWORD = 'test_password'
 
-SLUG = 'sample_slug'
 NEW_SLUG = 'new_slug'
 
 CREATE_NOTE_DATA = {
@@ -31,40 +29,6 @@ UPDATE_NOTE_DATA = {
     'title': 'Updated comment',
     'text': 'Обновлённый текст комментария',
 }
-
-URLS = namedtuple(
-    'URLs', (
-        'home',
-        'login',
-        'logout',
-        'signup',
-        'add_note',
-        'success',
-        'notes_list',
-        'note_detail',
-        'edit_note',
-        'delete_note',
-    )
-)
-URLS_INSTANCE = URLS(
-    reverse('notes:home'),
-    reverse('users:login'),
-    reverse('users:logout'),
-    reverse('users:signup'),
-    reverse('notes:add'),
-    reverse('notes:success'),
-    reverse('notes:list'),
-    reverse('notes:detail', args=(SLUG,)),
-    reverse('notes:edit', args=(SLUG,)),
-    reverse('notes:delete', args=(SLUG,)),
-)
-
-PUBLIC_URLS = [
-    URLS_INSTANCE.home,
-    URLS_INSTANCE.login,
-    URLS_INSTANCE.signup,
-    URLS_INSTANCE.logout,
-]
 
 
 class BaseTestCase(TestCase):

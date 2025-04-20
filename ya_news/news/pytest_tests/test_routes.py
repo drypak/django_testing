@@ -2,6 +2,7 @@ import pytest
 from http import HTTPStatus
 
 from django.contrib.auth import get_user_model
+from news.models import Comment
 
 
 User = get_user_model()
@@ -9,28 +10,38 @@ User = get_user_model()
 pytestmark = pytest.mark.django_db
 
 
-def test_home_and_detail_avilable_for_anonymous_user(
-        client,
-        home_url,
-        news_url
+@pytest.mark.parametrize(
+    'url_name',
+    ['home_url', 'news_url']
+)
+def test_pages_available_for_anonymous_user(
+    client,
+    request,
+    url_name,
 ):
     """
-    Проверяет, что главная и детальная страницы
-    Доступны для анонимных пользователей.
+    Проверяет, что страницы должны быть доступны
+    Для анонимных пользователей.
     """
-    assert client.get(home_url).status_code == HTTPStatus.OK
-    assert client.get(news_url).status_code == HTTPStatus.OK
+    url = request.getfixturevalue(url_name)
+
+    response = client.get(url)
+
+    assert response.status_code == HTTPStatus.OK
 
 
 def test_edit_delete_pages_for_comment_author(
         author_client,
         delete_comment_url,
         edit_comment_url,
+        comment
 ):
     """
     Проверяет, что страницы редактирования и удаления
     Доступны только автору комментария.
     """
+    assert Comment.objects.filter(pk=comment.pk).exists()
+
     response_edit = author_client.get(edit_comment_url)
     response_delete = author_client.get(delete_comment_url)
 
@@ -66,8 +77,7 @@ def test_redirects_anonymous_user_to_login(
 )
 def test_cannot_edit_or_delete_foreign_comment(
         request,
-        reader,
-        client,
+        reader_client,
         url_fixture_name,
 ):
     """
@@ -75,10 +85,9 @@ def test_cannot_edit_or_delete_foreign_comment(
     Не может редактировать или удалять
     Комментарии другого пользователя.
     """
-    client.force_login(reader)
     url = request.getfixturevalue(url_fixture_name)
+    response = reader_client.get(url)
 
-    response = client.get(url)
     assert response.status_code == HTTPStatus.NOT_FOUND
 
 

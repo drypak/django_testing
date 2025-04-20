@@ -136,12 +136,12 @@ def authenticated_client(user):
 
 @pytest.fixture
 def edit_comment_url(comment):
-    return reverse('news:edit', args=[comment.id])
+    return reverse('news:edit', args=[comment.pk])
 
 
 @pytest.fixture
 def delete_comment_url(comment):
-    return reverse('news:delete', args=[comment.id])
+    return reverse('news:delete', args=[comment.pk])
 
 
 @pytest.fixture
@@ -171,3 +171,34 @@ def other_user():
         username='otheruser',
         password='password'
     )
+
+
+@pytest.fixture
+def many_news():
+    return News.objects.bulk_create(
+        News(
+            title=f'title{i}',
+            text=f'text{i}',
+            date=timezone.now(),
+        )
+        for i in range(settings.NEWS_COUNT_ON_HOME_PAGE + 1)
+    )
+
+
+@pytest.fixture
+def comment_author_client(author):
+    client = Client()
+    client.force_login(author)
+    return client
+
+
+@pytest.fixture
+def comment_author_only_urls(edit_comment_url, delete_comment_url):
+    return [edit_comment_url, delete_comment_url]
+
+
+@pytest.fixture
+def reader_client(reader):
+    client = Client()
+    client.force_login(reader)
+    return client

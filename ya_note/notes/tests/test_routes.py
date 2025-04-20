@@ -1,10 +1,12 @@
 from http import HTTPStatus
 
-from .base_test import (
-    BaseTestCase,
+from .base_test import BaseTestCase, UPDATE_NOTE_DATA
+
+from .urls_groups import (
     URLS_INSTANCE,
-    UPDATE_NOTE_DATA,
-    PUBLIC_URLS,
+    PUBLIC_URL_NAMES,
+    AUTH_URL_NAMES,
+    AUTHOR_ONLY_URL_NAMES,
 )
 
 
@@ -13,12 +15,14 @@ class TestNoteRoutes(BaseTestCase):
 
     def test_public_routes_accessible_for_anonymous(self):
         """Публичные роуты доступны для анонимных пользователей."""
-        for route in PUBLIC_URLS:
-            with self.subTest(route=route):
-                response = self.anonymous_client.get(route)
+        for name in PUBLIC_URL_NAMES:
+            with self.subTest(route=name):
+                url = getattr(URLS_INSTANCE, name)
+                response = self.anonymous_client.get(url)
                 self.assertEqual(response.status_code, HTTPStatus.OK)
 
     def test_protected_routes_redirect_for_anonymous(self):
+        """Проверка редиректа для анонимных пользователей."""
         protected_routes = [
             URLS_INSTANCE.notes_list,
             URLS_INSTANCE.add_note,
@@ -33,17 +37,14 @@ class TestNoteRoutes(BaseTestCase):
 
     def test_auth_user_routes_available(self):
         """Проверка доступности для авторизованных пользователей."""
-        for name in [
-            'notes_list',
-            'add_note',
-        ]:
+        for name in AUTH_URL_NAMES:
             with self.subTest(name=name):
                 response = self.user_client.get(getattr(URLS_INSTANCE, name))
                 self.assertEqual(response.status_code, HTTPStatus.OK)
 
     def test_other_user_gets_404_on_protected_routes(self):
         """Проверка доступности к чужим заметкам."""
-        for name in ['note_detail', 'edit_note', 'delete_note']:
+        for name in AUTHOR_ONLY_URL_NAMES:
             route = getattr(URLS_INSTANCE, name)
             with self.subTest(name=name):
                 response = self.reader_client.get(route)
@@ -53,32 +54,20 @@ class TestNoteRoutes(BaseTestCase):
         """Проверка редиректа для анонимных пользователей."""
         self.client.logout()
         login_url = URLS_INSTANCE.login
-        protected = [
-            'notes_list',
-            'add_note',
-            'success',
-            'delete_note',
-            'note_detail',
-            'edit_note',
-        ]
-        for name in protected:
+
+        for name in AUTH_URL_NAMES:
             with self.subTest(name=name):
-                response = self.client.get(getattr(URLS_INSTANCE, name))
-                self.assertRedirects(
-                    response,
-                    f'{login_url}?next={getattr(URLS_INSTANCE, name)}',
-                )
+                url = getattr(URLS_INSTANCE, name)
+                response = self.client.get(url)
+                self.assertRedirects(response, f'{login_url}?next={url}')
 
     def test_auth_routes_available_to_all_users(self):
         """Проверка доступности для всех пользователей."""
         self.client.logout()
-        for name in [
-            'signup',
-            'login',
-            'logout',
-        ]:
+        for name in PUBLIC_URL_NAMES:
             with self.subTest(name=name):
-                response = self.client.get(getattr(URLS_INSTANCE, name))
+                url = getattr(URLS_INSTANCE, name)
+                response = self.client.get(url)
                 self.assertEqual(response.status_code, HTTPStatus.OK)
 
     def test_create_note_redirects_to_success_page(self):

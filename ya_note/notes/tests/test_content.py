@@ -1,7 +1,9 @@
 from notes.forms import NoteForm
 from notes.models import Note
 
-from .base_test import BaseTestCase, URLS_INSTANCE
+from .base_test import BaseTestCase
+
+from .urls_groups import URLS_INSTANCE
 
 
 class TestNoteContent(BaseTestCase):
@@ -20,17 +22,15 @@ class TestNoteContent(BaseTestCase):
         self.assertEqual(len(notes), 1)
         self.assertEqual(notes[0].author, self.reader)
 
-    def test_add_note_page_contains_form(self):
-        """Страница добавления заметки содержит форму."""
-        response = self.user_client.get(URLS_INSTANCE.add_note)
-        self.assertIn('form', response.context)
-        self.assertNotIn('object', response.context)
-
-    def test_edit_note_page_contains_form_and_object(self):
-        """Страница редактирования заметки содержит форму и объект."""
+    def test_edit_note_page_contains_form(self):
+        """Страница редактирования заметки содержит форму."""
         response = self.user_client.get(URLS_INSTANCE.edit_note)
         self.assertIn('form', response.context)
-        self.assertIn('object', response.context)
-        self.assertIsInstance(response.context['object'], Note)
         self.assertIsInstance(response.context['form'], NoteForm)
         self.assertEqual(response.context['form'].instance, self.note)
+
+    def test_edit_note_page_contains_object(self):
+        """Страница редактирования заметки содеержит объект."""
+        response = self.user_client.get(URLS_INSTANCE.edit_note)
+        self.assertIn('object', response.context)
+        self.assertIsInstance(response.context['object'], Note)

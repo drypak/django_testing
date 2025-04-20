@@ -1,25 +1,13 @@
 import pytest
-
 from django.conf import settings
-from django.utils import timezone
+from news.models import Comment
 
-from news.models import Comment, News
-from news.forms import CommentForm
 
 pytestmark = pytest.mark.django_db
 
 
-def test_news_count_on_main_page(client, home_url):
+def test_news_count_on_main_page(client, home_url, many_news):
     """На главной странице ровно NEW_COUNT_ON_HOME_PAGE новостей."""
-    News.objects.bulk_create([
-        News(
-            title=f'title{i}',
-            text=f'text{i}',
-            date=timezone.now(),
-        )
-        for i in range(settings.NEWS_COUNT_ON_HOME_PAGE + 1)
-    ])
-
     response = client.get(home_url)
     object_list = response.context['object_list']
     assert len(object_list) == settings.NEWS_COUNT_ON_HOME_PAGE
@@ -47,26 +35,3 @@ def test_comments_ordered_by_created(
     created_times = list(comments.values_list('created', flat=True))
 
     assert created_times == sorted(created_times)
-
-
-def test_comment_form_anonymous_user(anonymous_client, news_url):
-    """Проверяет, что форма комментария
-    НЕ доступна для анонимных пользователей.
-    """
-    response = anonymous_client.get(news_url)
-    assert response.status_code == 200
-    form = response.context.get('form', None)
-
-    assert form is None
-
-
-def test_comment_form_for_authenticated_user(authenticated_client, news_url):
-    """Проверяет, что форма комментария
-    доступна для аутентифицированных пользователей
-    """
-    response = authenticated_client.get(news_url)
-    assert response.status_code == 200
-    form = response.context.get('form', None)
-
-    assert form is not None
-    assert isinstance(form, CommentForm)

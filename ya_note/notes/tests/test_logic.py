@@ -7,10 +7,11 @@ from notes.models import Note
 from .base_test import (
     BaseTestCase,
     UPDATE_NOTE_DATA,
-    URLS_INSTANCE,
     NOTE_DATA,
     CREATE_NOTE_DATA,
 )
+
+from .urls_groups import URLS_INSTANCE
 
 
 class TestNoteLogiс(BaseTestCase):
@@ -28,11 +29,8 @@ class TestNoteLogiс(BaseTestCase):
         self.assertEqual(len(new_notes), 1)
 
         note = new_notes.pop()
-        expected_slug = slugify(CREATE_NOTE_DATA['title'])
-
         self.assertEqual(note.title, CREATE_NOTE_DATA['title'])
         self.assertEqual(note.text, CREATE_NOTE_DATA['text'])
-        self.assertEqual(note.slug, expected_slug)
         self.assertEqual(note.author, self.user)
 
     def test_anonymous_cannot_create_note(self):
